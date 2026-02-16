@@ -3,6 +3,8 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+terraform.tfvars
+
 # C extensions
 *.so
 

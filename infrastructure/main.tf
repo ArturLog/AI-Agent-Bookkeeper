@@ -18,3 +18,18 @@ provider "google" {
     region                  = var.region
     user_project_override   = true
 }
+
+resource "google_project_service" "default" {
+    project = var.projectId
+
+    for_each = toset([
+        "cloudscheduler.googleapis.com",
+        "cloudfunctions.googleapis.com",
+        "run.googleapis.com",
+        "secretmanager.googleapis.com",
+        "cloudbuild.googleapis.com"
+    ])
+
+    service = each.key
+    disable_on_destroy = false
+}

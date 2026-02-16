@@ -1,0 +1,2 @@
+projectId   = ""
+region      = ""
