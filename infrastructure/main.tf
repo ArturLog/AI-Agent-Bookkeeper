@@ -123,6 +123,13 @@ resource "google_cloudfunctions2_function" "reminder_function" {
   depends_on = [google_project_service.default]
 }
 
+resource "google_cloud_run_service_iam_member" "invoker_permission" {
+  location = google_cloudfunctions2_function.reminder_function.location
+  service  = google_cloudfunctions2_function.reminder_function.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.agent_sa.email}"
+}
+
 # Cloud Scheduler
 resource "google_cloud_scheduler_job" "monthly_trigger" {
   name             = "monthly-reminder-trigger"
