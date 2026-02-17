@@ -38,6 +38,8 @@ override.tf.json
 .terraformrc
 terraform.rc
 
+# Zip file
+*.zip
 
 # VS Code
 .vscode
