@@ -3,34 +3,42 @@ import smtplib
 import functions_framework
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import formatdate
 
 @functions_framework.http
 def send_monthly_reminder(request):
     try:
-        smtp_server = os.environ.get("SMTP_SERVER")
-        smtp_port = int(os.environ.get("SMTP_PORT"))
-        sender_email = os.environ.get("SENDER_EMAIL")
-        receiver_email = os.environ.get("RECEIVER_EMAIL")
-        email_password = os.environ.get("EMAIL_PASSWORD")
+        smtp_server = os.getenv("SMTP_SERVER")
+        smtp_port = int(os.getenv("SMTP_PORT"))
+        sender_email = os.getenv("SENDER_EMAIL")
+        receiver_email = os.getenv("RECEIVER_EMAIL")
+        email_password = os.getenv("EMAIL_PASSWORD")
 
         if not all([sender_email, receiver_email, email_password]):
             return "Configuration missing", 500
 
-        msg = MIMEMultipart()
+        msg = MIMEMultipart('alternative')
         msg['From'] = sender_email
         msg['To'] = receiver_email
-        msg['Subject'] = "Start Monthly Financial Report"
+        msg['Subject'] = "Monthly Financial Report - Ingestion Started"
+        msg['Date'] = formatdate(localtime=True)
+        msg['Message-ID'] = f"<{os.urandom(16).hex()}@{sender_email.split('@')[-1]}>"
 
-        body = """
+        html = """
         <html>
-          <body>
-            <h3>It's the 1st of the month!</h3>
-            <p>The Automated Financial Agent has started the ingestion process.</p>
-            <p>Please check the Telegram channel and wait for the verification link.</p>
-          </body>
+            <head></head>
+            <body>
+                <h3>Monthly Financial Report Ingestion</h3>
+                <p>Hello,</p>
+                <p>This is an automated notification that the <b>Automated Financial Agent</b> has started the monthly ingestion process.</p>
+                <p>Regards,<br>Automated Financial Agent</p>
+            </body>
         </html>
         """
-        msg.attach(MIMEText(body, 'html'))
+
+        mime_text = MIMEText(html, 'html')
+
+        msg.attach(mime_text)
 
         with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
             server.login(sender_email, email_password)
