@@ -13,8 +13,8 @@ terraform {
 }
 
 provider "google" {
-    project                 = var.projectId
-    billing_project         = var.projectId
+    project                 = var.project_id
+    billing_project         = var.project_id
     region                  = var.region
     user_project_override   = true
 }
@@ -23,6 +23,8 @@ resource "google_project_service" "default" {
     project = var.project_id
 
     for_each = toset([
+        "cloudresourcemanager.googleapis.com",
+        "serviceusage.googleapis.com",
         "cloudscheduler.googleapis.com",
         "cloudfunctions.googleapis.com",
         "run.googleapis.com",
@@ -105,9 +107,9 @@ resource "google_cloudfunctions2_function" "reminder_function" {
     service_account_email = google_service_account.agent_sa.email
 
     environment_variables = {
-      SMTP_SERVER    = var.smtp_server
-      SMTP_PORT      = var.smtp_port
-      SENDER_EMAIL   = var.email_sender
+      SMTP_SERVER    = var.agent_smtp_server
+      SMTP_PORT      = var.agent_smtp_port
+      SENDER_EMAIL   = var.agent_email
       RECEIVER_EMAIL = var.email_receiver
     }
 
@@ -126,7 +128,7 @@ resource "google_cloud_scheduler_job" "monthly_trigger" {
   name             = "monthly-reminder-trigger"
   description      = "Triggers monthly reminder on 1st of month at 9am"
   schedule         = "0 9 1 * *"
-  time_zone        = "America/Central"
+  time_zone        = "America/Chicago"
   attempt_deadline = "320s"
 
   http_target {
