@@ -71,7 +71,7 @@ resource "google_storage_bucket" "source_bucket" {
 
 data "archive_file" "source_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/src"
+  source_dir  = "${path.module}/../src"
   output_path = "${path.module}/function.zip"
 }
 
