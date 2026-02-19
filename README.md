@@ -39,7 +39,7 @@ cp example.tfvars terraform.tfvars
 terraform init
 ```
 
-3. Plan terraform
+3. Create an execution plan
 
 ```bash
 terraform plan
