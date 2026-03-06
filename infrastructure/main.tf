@@ -29,7 +29,10 @@ resource "google_project_service" "default" {
         "cloudfunctions.googleapis.com",
         "run.googleapis.com",
         "secretmanager.googleapis.com",
-        "cloudbuild.googleapis.com"
+        "cloudbuild.googleapis.com",
+        "drive.googleapis.com",
+        "vision.googleapis.com",
+        "storage.googleapis.com"
     ])
 
     service = each.key
@@ -64,11 +67,34 @@ resource "google_secret_manager_secret_iam_member" "agent_secret_access" {
   member    = "serviceAccount:${google_service_account.agent_sa.email}"
 }
 
-# Cloud Bucket
+# Data Storage Bucket
+resource "google_storage_bucket" "data_bucket" {
+  name                        = "${var.project_id}-data"
+  location                    = var.region
+  uniform_bucket_level_access = true
+  depends_on                  = [google_project_service.default]
+}
+
+# IAM Permissions for Vision and Storage
+resource "google_project_iam_member" "agent_vision" {
+  project = var.project_id
+  role    = "roles/visionai.admin"
+  member  = "serviceAccount:${google_service_account.agent_sa.email}"
+  depends_on = [google_project_service.default]
+}
+
+resource "google_storage_bucket_iam_member" "agent_storage_data" {
+  bucket = google_storage_bucket.data_bucket.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.agent_sa.email}"
+}
+
+# Source Storage Bucket
 resource "google_storage_bucket" "source_bucket" {
   name                        = "${var.project_id}-source"
-  location                    = "US"
+  location                    = var.region
   uniform_bucket_level_access = true
+  depends_on                  = [google_project_service.default]
 }
 
 data "archive_file" "source_zip" {
@@ -81,17 +107,18 @@ resource "google_storage_bucket_object" "zip_object" {
   name   = "source-${data.archive_file.source_zip.output_md5}.zip"
   bucket = google_storage_bucket.source_bucket.name
   source = data.archive_file.source_zip.output_path
+  depends_on = [google_storage_bucket.source_bucket]
 }
 
 # Cloud Function
 resource "google_cloudfunctions2_function" "reminder_function" {
-  name        = "monthly-reminder"
+  name        = "monthly-ingestion"
   location    = var.region
-  description = "Sends monthly email reminder to the user"
+  description = "Monthly ingestion pipeline"
 
   build_config {
     runtime     = "python311"
-    entry_point = "send_monthly_reminder"
+    entry_point = "main_handler"
     source {
       storage_source {
         bucket = google_storage_bucket.source_bucket.name
@@ -107,10 +134,12 @@ resource "google_cloudfunctions2_function" "reminder_function" {
     service_account_email = google_service_account.agent_sa.email
 
     environment_variables = {
-      SMTP_SERVER    = var.agent_smtp_server
-      SMTP_PORT      = var.agent_smtp_port
-      SENDER_EMAIL   = var.agent_email
-      RECEIVER_EMAIL = var.email_receiver
+      SMTP_SERVER            = var.agent_smtp_server
+      SMTP_PORT              = var.agent_smtp_port
+      SENDER_EMAIL           = var.agent_email
+      RECEIVER_EMAIL         = var.email_receiver
+      DATA_BUCKET            = google_storage_bucket.data_bucket.name
+      GOOGLE_DRIVE_FOLDER_ID = var.google_drive_folder_id
     }
 
     secret_environment_variables {

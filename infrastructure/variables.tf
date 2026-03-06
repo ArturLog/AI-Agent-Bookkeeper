@@ -27,3 +27,7 @@ variable "agent_smtp_port" {
 variable "email_receiver" {
   type          = string
 }
+
+variable "google_drive_folder_id" {
+  type          = string
+}
