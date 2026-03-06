@@ -50,3 +50,49 @@ terraform plan
 ```bash
 terraform apply
 ```
+
+## Local Testing
+
+1. Grant permission to impersonate as service account
+
+```bash
+gcloud iam service-accounts add-iam-policy-binding agent-sa@ai-agent-bookkeeper.iam.gserviceaccount.com 
+--member="user:YOUR_EMAIL@gmail.com" 
+--role="roles/iam.serviceAccountTokenCreator"
+```
+
+2. Login as a service account (wait a while after granting permissions)
+
+```bash
+gcloud auth application-default login --impersonate-service-account agent-sa@ai-agent-bookkeeper.iam.gserviceaccount.com
+```
+
+3. Create .env file based on example.env file
+
+```bash
+cp example.env .env
+```
+
+4. Create a virtual environment
+
+```bash
+python -m venv .venv
+```
+
+5. Activate the virtual environment
+
+```bash
+.venv\Scripts\activate
+```
+
+6. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+7. Run the pipeline
+
+```bash
+python main.py
+```

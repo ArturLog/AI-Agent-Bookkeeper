@@ -32,7 +32,8 @@ resource "google_project_service" "default" {
         "cloudbuild.googleapis.com",
         "drive.googleapis.com",
         "vision.googleapis.com",
-        "storage.googleapis.com"
+        "storage.googleapis.com",
+        "sheets.googleapis.com"
     ])
 
     service = each.key
