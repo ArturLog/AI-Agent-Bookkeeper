@@ -19,14 +19,14 @@ class DriveService:
 
     def list_images(self, folder_id: str = None) -> list:
         """
-        Lists image files in a Google Drive folder.
+        Lists image files in a Google Drive folder, including standard formats and HEIC.
         """
         folder_id = folder_id or GOOGLE_DRIVE_FOLDER_ID
         if not folder_id:
             raise ValueError("Missing GOOGLE_DRIVE_FOLDER_ID")
 
         results = self._service.files().list(
-            q=f"'{folder_id}' in parents and mimeType contains 'image/'",
+            q=f"'{folder_id}' in parents and (mimeType contains 'image/' or mimeType='image/heic' or name contains '.heic')",
             fields="files(id, name, mimeType)"
         ).execute()
         return results.get('files', [])

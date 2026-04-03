@@ -12,6 +12,7 @@ SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 SHIFT_HOURS = "shift-hours"
 SHIFT_REPORT = "shift-report"
@@ -26,6 +27,7 @@ def validate_config():
     if not RECEIVER_EMAIL: missing.append("RECEIVER_EMAIL")
     if not EMAIL_PASSWORD: missing.append("EMAIL_PASSWORD")
     if not SPREADSHEET_ID: missing.append("SPREADSHEET_ID")
+    if not GEMINI_API_KEY: missing.append("GEMINI_API_KEY")
     
     if missing:
         raise ValueError(f"Missing required environment variables: {', '.join(missing)}")

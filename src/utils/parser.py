@@ -1,5 +1,33 @@
 import re
 import datetime
+import io
+from PIL import Image
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except (ImportError, AttributeError):
+    pillow_heif = None
+
+def convert_heic_to_jpeg(content: bytes) -> bytes:
+    """
+    Converts HEIC image content to JPEG bytes.
+    If already JPEG or other format, returns original content.
+    """
+    try:
+        img = Image.open(io.BytesIO(content))
+        
+        if img.format and 'HEIC' in img.format.upper():
+            if img.mode in ('RGBA', 'LA', 'P'):
+                img = img.convert('RGB')
+            
+            jpeg_buffer = io.BytesIO()
+            img.save(jpeg_buffer, format='JPEG', quality=95)
+            return jpeg_buffer.getvalue()
+        
+        return content
+    except Exception as e:
+        print(f"Warning: Failed to convert HEIC. Error: {e}. Using original content.")
+        return content
 
 def round_minutes(mins: int) -> float:
     """

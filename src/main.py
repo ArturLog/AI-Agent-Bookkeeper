@@ -2,15 +2,19 @@ import datetime
 import functions_framework
 from dateutil.relativedelta import relativedelta
 from config import validate_config, SHIFT_HOURS, SHIFT_REPORT, SPREADSHEET_ID
-from services import DriveService, VisionService, StorageService, EmailService, SheetsService
+from services import DriveService, VisionService, LLMService, StorageService, EmailService, SheetsService
+from utils.parser import convert_heic_to_jpeg
 
 class PipelineProcessor:
     """
     Orchestrates ingestion, classification, and analysis.
+    - Uses Vision API for categorization
+    - Uses Gemini LLM for detailed analysis
     """
     def __init__(self):
         self.drive = DriveService()
         self.vision = VisionService()
+        self.llm = LLMService()
         self.storage = StorageService()
         self.email = EmailService()
 
@@ -33,7 +37,6 @@ class PipelineProcessor:
             file_id, file_name, mime_type = file['id'], file['name'], file['mimeType']
             print(f"Processing: {file_name}")
 
-            # Check if file already exists in GCS (within this month)
             existing_path = self.storage.find_file_in_month(file_name, month_year)
             
             content = None
@@ -47,18 +50,25 @@ class PipelineProcessor:
                 # We only need content if we are going to analyze it
                 if category in [SHIFT_HOURS, SHIFT_REPORT]:
                     content = self.drive.download_file(file_id)
+                    # Convert HEIC to JPEG for Vision API compatibility
+                    content = convert_heic_to_jpeg(content)
             else:
                 content = self.drive.download_file(file_id)
-                category = self.vision.categorize_image(content)
+                # Convert HEIC to JPEG for Vision API compatibility (for categorization)
+                content_for_vision = convert_heic_to_jpeg(content)
+                category = self.vision.categorize_image(content_for_vision)
                 print(f"Category: {category}")
+                # Store original content in GCS
                 self.storage.upload_image(content, file_name, category, month_year, mime_type)
+                # Use converted content for further processing
+                content = content_for_vision
 
             if category == SHIFT_HOURS and content:
-                result = self.vision.analyze_shift_hours(content)
+                result = self.llm.analyze_shift_hours(content)
                 all_results.append(result)
                 print(f"Analysis for {file_name} completed. Found {len(result['data'])} records.")
             elif category == SHIFT_REPORT and content:
-                result = self.vision.analyze_shift_report(content)
+                result = self.llm.analyze_shift_report(content)
                 all_results.append(result)
                 print(f"Analysis for report {file_name} completed. Date: {result['date_str']}")
 
