@@ -1,8 +1,8 @@
 import datetime
 import functions_framework
 from dateutil.relativedelta import relativedelta
-from config import validate_config, SHIFT_HOURS
-from services import DriveService, VisionService, StorageService, EmailService
+from config import validate_config, SHIFT_HOURS, SHIFT_REPORT, SPREADSHEET_ID
+from services import DriveService, VisionService, StorageService, EmailService, SheetsService
 
 class PipelineProcessor:
     """
@@ -45,24 +45,24 @@ class PipelineProcessor:
                 category = existing_path.split('/')[1]
                 
                 # We only need content if we are going to analyze it
-                if category == SHIFT_HOURS:
+                if category in [SHIFT_HOURS, SHIFT_REPORT]:
                     content = self.drive.download_file(file_id)
             else:
                 content = self.drive.download_file(file_id)
-                
                 category = self.vision.categorize_image(content)
                 print(f"Category: {category}")
-                
                 self.storage.upload_image(content, file_name, category, month_year, mime_type)
 
             if category == SHIFT_HOURS and content:
                 result = self.vision.analyze_shift_hours(content)
                 all_results.append(result)
                 print(f"Analysis for {file_name} completed. Found {len(result['data'])} records.")
+            elif category == SHIFT_REPORT and content:
+                result = self.vision.analyze_shift_report(content)
+                all_results.append(result)
+                print(f"Analysis for report {file_name} completed. Date: {result['date_str']}")
 
         return all_results
-
-
 
 @functions_framework.http
 def main_handler(request):
@@ -83,12 +83,30 @@ def main_handler(request):
         results = processor.run()
 
         if results:
-            print(f"Processed {len(results)} shift-hour images.")
-            for res in results:
-                summary = f"Summary for {res['name']} ({res['month']} {res['year']}):\n"
-                for entry in res['data']:
-                    summary += f" - Day {entry['day']}: {entry['hours_decimal']}h\n"
-                print(summary)
+            hours_data = [r for r in results if r['type'] == SHIFT_HOURS]
+            reports = [r for r in results if r['type'] == SHIFT_REPORT]
+            
+            reports.sort(key=lambda x: x['date'] if x['date'] else datetime.datetime.min)
+
+            last_month = datetime.datetime.now() - relativedelta(months=1)
+            sheet_name = last_month.strftime("%B%Y").lower()
+
+            print(f"Processed {len(hours_data)} shift-hours files and {len(reports)} shift-reports.")
+
+            sheets = SheetsService(SPREADSHEET_ID)
+            sheets.update_monthly_sheet(sheet_name, reports, hours_data)
+            
+            sheet_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
+            email_notifier.send_email(
+                subject=f"Monthly Report Completed - {sheet_name}",
+                message_body=f"""
+                Ingestion and analysis finished successfully.<br><br>
+                <b>Summary:</b><br>
+                - Reports found: {len(reports)}<br>
+                - Employee records: {len(hours_data)}<br><br>
+                View results here: <a href="{sheet_url}">Google Sheet</a>
+                """
+            )
 
         return "Process completed successfully", 200
 
@@ -97,28 +115,28 @@ def main_handler(request):
         print(f"ERROR: {error_msg}")
         email_notifier.send_email(
             subject="ALERT: Monthly Financial Report Failed",
-            message_body=f"Failed with error: <b>{str(e)}</b><br><br>Please check GC logs."
+            message_body=f"Failed with error: <b>{str(e)}</b><br><br>Please check Google Cloud console logs."
         )
         return f"Error: {e}", 500
 
-
-# Uncomment to run locally
+# Local execution
 if __name__ == "__main__":
     try:
         validate_config()
         proc = PipelineProcessor()
-        
         results = proc.run()
 
         if results:
-            print(f"Processed {len(results)} shift-hour images.")
-            for res in results:
-                summary = f"Summary for {res['name']} ({res['month']} {res['year']}):\n"
-                for entry in res['data']:
-                    summary += f" - Day {entry['day']}: {entry['hours_decimal']}h\n"
-                print(summary)
-        
-        print(f"Processed {len(res)} results.")
+            hours_data = [r for r in results if r['type'] == SHIFT_HOURS]
+            reports = [r for r in results if r['type'] == SHIFT_REPORT]
+            reports.sort(key=lambda x: x['date'] if x['date'] else datetime.datetime.min)
+
+            last_month = datetime.datetime.now() - relativedelta(months=1)
+            sheet_name = last_month.strftime("%B%Y").lower()
+
+            sheets = SheetsService(SPREADSHEET_ID)
+            sheets.update_monthly_sheet(sheet_name, reports, hours_data)
+            print(f"DONE locally. Sheet '{sheet_name}' updated.")
         
     except Exception as e:
         print(f"LOCAL ERROR: {e}")

@@ -141,6 +141,7 @@ resource "google_cloudfunctions2_function" "reminder_function" {
       RECEIVER_EMAIL         = var.email_receiver
       DATA_BUCKET            = google_storage_bucket.data_bucket.name
       GOOGLE_DRIVE_FOLDER_ID = var.google_drive_folder_id
+      SPREADSHEET_ID         = var.spreadsheet_id
     }
 
     secret_environment_variables {

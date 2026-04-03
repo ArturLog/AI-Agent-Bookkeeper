@@ -31,3 +31,7 @@ variable "email_receiver" {
 variable "google_drive_folder_id" {
   type          = string
 }
+
+variable "spreadsheet_id" {
+  type          = string
+}
