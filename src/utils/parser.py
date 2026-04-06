@@ -1,33 +1,73 @@
 import re
 import datetime
 import io
-from PIL import Image
+from PIL import Image, ImageOps
 try:
     import pillow_heif
     pillow_heif.register_heif_opener()
-except (ImportError, AttributeError):
-    pillow_heif = None
+    HEIF_SUPPORTED = True
+except (ImportError, AttributeError, Exception):
+    HEIF_SUPPORTED = False
+
+def _is_heic_file(content: bytes) -> bool:
+    """
+    Checks if content is a HEIC/HEIF file by looking at magic bytes.
+    HEIC files start with specific byte patterns.
+    """
+    if len(content) < 12:
+        return False
+    # HEIC/HEIF files have 'ftyp' signature followed by 'heic', 'heix', 'hevc', or 'hevx'
+    return content[4:8] == b'ftyp' and content[8:12] in (b'heic', b'heix', b'hevc', b'hevx')
 
 def convert_heic_to_jpeg(content: bytes) -> bytes:
     """
-    Converts HEIC image content to JPEG bytes.
+    Converts HEIC/HEIF image content to JPEG bytes.
     If already JPEG or other format, returns original content.
     """
     try:
-        img = Image.open(io.BytesIO(content))
+        # Open image from bytes. Pillow + pillow_heif handles detection automatically.
+        img_bytes = io.BytesIO(content)
         
-        if img.format and 'HEIC' in img.format.upper():
-            if img.mode in ('RGBA', 'LA', 'P'):
+        try:
+            img = Image.open(img_bytes)
+        except Exception:
+            # If Pillow can't open it at all, return the original bytes
+            return content
+        
+        # pillow_heif identifies these files as 'HEIF'
+        if img.format in ('HEIF', 'HEIC'):
+            
+            # Extract metadata before doing anything else
+            # This preserves original colors and metadata (GPS, Date, etc.)
+            icc_profile = img.info.get('icc_profile', b'')
+            exif = img.info.get('exif', b'')
+            
+            # Apply EXIF rotation. iPhones save images sideways and use EXIF to rotate them.
+            # This ensures the JPEG is actually saved right-side up.
+            img = ImageOps.exif_transpose(img)
+            
+            # Convert color mode if needed (JPEG doesn't support Alpha/Transparency)
+            if img.mode != 'RGB':
                 img = img.convert('RGB')
             
+            # Save to JPEG
             jpeg_buffer = io.BytesIO()
-            img.save(jpeg_buffer, format='JPEG', quality=95)
+            img.save(
+                jpeg_buffer, 
+                format='JPEG', 
+                quality=95,
+                icc_profile=icc_profile, # Keeps colors accurate
+                exif=exif                # Keeps original metadata
+            )
+            
             return jpeg_buffer.getvalue()
         
+        # Not HEIC, return original
         return content
+        
     except Exception as e:
-        print(f"Warning: Failed to convert HEIC. Error: {e}. Using original content.")
-        return content
+        print(f"Error: Failed to convert HEIC. Error: {e}")
+        raise ValueError(f"HEIC conversion failed: {e}") from e
 
 def round_minutes(mins: int) -> float:
     """

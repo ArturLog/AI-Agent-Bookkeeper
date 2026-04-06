@@ -55,9 +55,7 @@ terraform apply
 1. Grant permission to impersonate as service account
 
 ```bash
-gcloud iam service-accounts add-iam-policy-binding agent-sa@ai-agent-bookkeeper.iam.gserviceaccount.com 
---member="user:YOUR_EMAIL@gmail.com" 
---role="roles/iam.serviceAccountTokenCreator"
+gcloud iam service-accounts add-iam-policy-binding agent-sa@ai-agent-bookkeeper.iam.gserviceaccount.com --member="user:EMAIL@gmail.com" --role="roles/iam.serviceAccountTokenCreator"
 ```
 
 2. Login as a service account (wait a while after granting permissions)

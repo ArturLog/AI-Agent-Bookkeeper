@@ -42,35 +42,36 @@ class PipelineProcessor:
             content = None
             category = None
 
-            if existing_path:
-                print(f"File {file_name} already exists in GCS at: {existing_path}. Skipping classification/upload.")
-                # Format: {monthyear}/{category}/{filename}
-                category = existing_path.split('/')[1]
-                
-                # We only need content if we are going to analyze it
-                if category in [SHIFT_HOURS, SHIFT_REPORT]:
+            try:
+                if existing_path:
+                    print(f"File {file_name} already exists in GCS at: {existing_path}. Skipping classification/upload.")
+                    category = existing_path.split('/')[1]
+                    
+                    if category in [SHIFT_HOURS, SHIFT_REPORT]:
+                        content = self.drive.download_file(file_id)
+                        content = convert_heic_to_jpeg(content)
+                else:
                     content = self.drive.download_file(file_id)
-                    # Convert HEIC to JPEG for Vision API compatibility
-                    content = convert_heic_to_jpeg(content)
-            else:
-                content = self.drive.download_file(file_id)
-                # Convert HEIC to JPEG for Vision API compatibility (for categorization)
-                content_for_vision = convert_heic_to_jpeg(content)
-                category = self.vision.categorize_image(content_for_vision)
-                print(f"Category: {category}")
-                # Store original content in GCS
-                self.storage.upload_image(content, file_name, category, month_year, mime_type)
-                # Use converted content for further processing
-                content = content_for_vision
+                    content_for_vision = convert_heic_to_jpeg(content)
+                    category = self.vision.categorize_image(content_for_vision)
+                    print(f"Category: {category}")
+                    # Upload converted JPEG content, not original HEIC
+                    upload_filename = file_name.lower().replace('.heic', '.jpeg')
+                    self.storage.upload_image(content_for_vision, upload_filename, category, month_year, 'image/jpeg')
+                    content = content_for_vision
 
-            if category == SHIFT_HOURS and content:
-                result = self.llm.analyze_shift_hours(content)
-                all_results.append(result)
-                print(f"Analysis for {file_name} completed. Found {len(result['data'])} records.")
-            elif category == SHIFT_REPORT and content:
-                result = self.llm.analyze_shift_report(content)
-                all_results.append(result)
-                print(f"Analysis for report {file_name} completed. Date: {result['date_str']}")
+                if category == SHIFT_HOURS and content:
+                    result = self.llm.analyze_shift_hours(content)
+                    all_results.append(result)
+                    print(f"Analysis for {file_name} completed. Found {len(result['data'])} records.")
+                elif category == SHIFT_REPORT and content:
+                    result = self.llm.analyze_shift_report(content)
+                    all_results.append(result)
+                    print(f"Analysis for report {file_name} completed. Date: {result['date_str']}")
+            
+            except ValueError as e:
+                print(f"Skipping {file_name}: {e}")
+                continue
 
         return all_results
 
