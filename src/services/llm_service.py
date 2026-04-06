@@ -13,7 +13,7 @@ class LLMService:
     
     def __init__(self):
         genai.configure(api_key=GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-2.0-flash')
+        self.model = genai.GenerativeModel('gemini-3-flash-preview')
     
     def analyze_shift_hours(self, content: bytes, prompt: str = None) -> dict:
         """
