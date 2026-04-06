@@ -33,7 +33,8 @@ resource "google_project_service" "default" {
         "drive.googleapis.com",
         "vision.googleapis.com",
         "storage.googleapis.com",
-        "sheets.googleapis.com"
+        "sheets.googleapis.com",
+        "aiplatform.googleapis.com"
     ])
 
     service = each.key
@@ -64,6 +65,28 @@ resource "google_secret_manager_secret_version" "agent_email_password_version" {
 
 resource "google_secret_manager_secret_iam_member" "agent_secret_access" {
   secret_id = google_secret_manager_secret.agent_email_password.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.agent_sa.email}"
+}
+
+# Gemini API Key Secret
+resource "google_secret_manager_secret" "gemini_api_key" {
+  secret_id = "gemini-api-key"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.default]
+}
+
+resource "google_secret_manager_secret_version" "gemini_api_key_version" {
+  secret      = google_secret_manager_secret.gemini_api_key.id
+  secret_data = var.gemini_api_key
+}
+
+resource "google_secret_manager_secret_iam_member" "gemini_secret_access" {
+  secret_id = google_secret_manager_secret.gemini_api_key.id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.agent_sa.email}"
 }
@@ -148,6 +171,13 @@ resource "google_cloudfunctions2_function" "reminder_function" {
       key        = "EMAIL_PASSWORD"
       project_id = var.project_id
       secret     = google_secret_manager_secret.agent_email_password.secret_id
+      version    = "latest"
+    }
+
+    secret_environment_variables {
+      key        = "GEMINI_API_KEY"
+      project_id = var.project_id
+      secret     = google_secret_manager_secret.gemini_api_key.secret_id
       version    = "latest"
     }
   }

@@ -35,3 +35,9 @@ variable "google_drive_folder_id" {
 variable "spreadsheet_id" {
   type          = string
 }
+
+variable "gemini_api_key" {
+  type          = string
+  sensitive     = true
+  description   = "Google Gemini API key for LLM analysis"
+}
